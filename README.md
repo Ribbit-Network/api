@@ -1,6 +1,29 @@
 # Ribbit Network API (WIP)
 
-This repository contains the backend services supporting the Ribbit Network.
+A public API for global CO2 measurements, powered by the Ribbit Network.
+
+## Example
+
+```
+GET /data?start=1970-01-01T00:00:00Z&stop=1970-01-01T01:00:00Z
+    &hosts=00000000000000000000000000000000,00000000000000000000000000000001
+    &fields=co2,lat,lon
+```
+
+```json
+{
+    "data": [
+        {
+            "host": "00000000000000000000000000000000",
+            "time": "1970-01-01T00:00:00.000000",
+            "co2": 0.0000000000000,
+            "lat": 0.00,
+            "lon": 0.00
+        },
+        ...
+    ]
+}
+```
 
 ## Running the API
 
