@@ -2,15 +2,10 @@ package internal
 
 import (
 	"context"
+	"os"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
-)
-
-const (
-	serverURL = "https://us-west-2-1.aws.cloud2.influxdata.com"
-	authToken = "***REMOVED***"
-	org       = "keenan.johnson@gmail.com"
 )
 
 type db struct {
@@ -18,11 +13,15 @@ type db struct {
 }
 
 func NewDB() *db {
-	return &db{influxdb2.NewClient(serverURL, authToken)}
+	serverUrl := os.Getenv("INFLUXDB_SERVER_URL")
+	authToken := os.Getenv("INFLUXDB_AUTH_TOKEN")
+
+	return &db{influxdb2.NewClient(serverUrl, authToken)}
 }
 
 func (d *db) Query(q string) (*api.QueryTableResult, error) {
-	queryAPI := d.Client.QueryAPI(org)
+	org := os.Getenv("INFLUXDB_ORG")
 	ctx := context.Background()
-	return queryAPI.Query(ctx, q)
+
+	return d.Client.QueryAPI(org).Query(ctx, q)
 }
