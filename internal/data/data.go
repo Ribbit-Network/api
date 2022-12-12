@@ -2,11 +2,8 @@ package data
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/Ribbit-Network/api/internal"
@@ -34,7 +31,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	q, err := transformURLToQuery(r.URL.Query())
+	q, err := NewQuery(r.URL.Query())
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -89,38 +86,6 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-}
-
-func transformURLToQuery(values url.Values) (string, error) {
-	q := query{}
-
-	if val := values.Get("start"); val != "" {
-		start, err := time.Parse(time.RFC3339, val)
-		if err != nil {
-			return "", err
-		}
-		q.start = start
-	} else {
-		return "", fmt.Errorf(`missing required parameter: "start"`)
-	}
-
-	if val := values.Get("stop"); val != "" {
-		stop, err := time.Parse(time.RFC3339, val)
-		if err != nil {
-			return "", err
-		}
-		q.stop = stop
-	}
-
-	if val := values.Get("hosts"); val != "" {
-		q.hosts = strings.Split(val, ",")
-	}
-
-	if val := values.Get("fields"); val != "" {
-		q.fields = strings.Split(val, ",")
-	}
-
-	return q.String(), nil
 }
 
 func getValues(m map[string]*Data) []*Data {
