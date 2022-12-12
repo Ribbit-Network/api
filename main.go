@@ -4,19 +4,23 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/Ribbit-Network/api/internal/data"
+	"github.com/joho/godotenv"
 )
 
-const port = 1024
-
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal(err)
+	}
+
 	http.HandleFunc("/", handle)
 	http.HandleFunc("/data", data.Handle)
 
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf(":%s", os.Getenv("PORT"))
 
-	log.Printf("API running at http://localhost:%d\n", port)
+	log.Println("API running at http://localhost" + addr)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatal(err)
 	}

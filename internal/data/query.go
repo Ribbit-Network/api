@@ -3,11 +3,13 @@ package data
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
 
 type query struct {
+	bucket   string
 	start    time.Time
 	stop     time.Time
 	hosts    []string
@@ -16,7 +18,7 @@ type query struct {
 }
 
 func NewQuery(values url.Values) (string, error) {
-	q := query{}
+	q := query{bucket: os.Getenv("INFLUXDB_BUCKET")}
 
 	if val := values.Get("start"); val != "" {
 		start, err := time.Parse(time.RFC3339, val)
@@ -57,7 +59,7 @@ func NewQuery(values url.Values) (string, error) {
 
 func (q query) String() string {
 	x := []string{
-		`from(bucket:"co2")`,
+		fmt.Sprintf(`from(bucket:"%s")`, q.bucket),
 		buildRange(q.start, q.stop),
 	}
 
