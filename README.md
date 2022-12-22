@@ -5,8 +5,8 @@ A public API for global CO2 measurements, powered by the Ribbit Network.
 ## Example
 
 ```
-GET /data?start=1970-01-01T00:00:00Z&stop=1970-01-01T01:00:00Z
-    &hosts=00000000000000000000000000000000,00000000000000000000000000000001
+GET /data?start=1970-01-01T00:00:00Z&stop=1970-01-01T00:00:10Z
+    &hosts=00000000000000000000000000000000,11111111111111111111111111111111
     &fields=co2,lat,lon
     &interval=5m
 ```
@@ -20,7 +20,8 @@ GET /data?start=1970-01-01T00:00:00Z&stop=1970-01-01T01:00:00Z
             "co2": 0.0000000000000,
             "lat": 0.00,
             "lon": 0.00
-        }
+        },
+        ...
     ]
 }
 ```
