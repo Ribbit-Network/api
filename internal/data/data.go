@@ -11,10 +11,6 @@ import (
 	"github.com/Ribbit-Network/api/internal"
 )
 
-type Wrapper struct {
-	Data []*Data `json:"data"`
-}
-
 type Data struct {
 	Time time.Time `json:"time"`
 	Host string    `json:"host"`
@@ -30,6 +26,7 @@ type Data struct {
 
 func Handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -50,22 +47,13 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	defer res.Close()
 
-	t := reflect.TypeOf(Data{})
-	fieldIndices := make(map[string]int)
-
-	for i := 0; i < t.NumField(); i++ {
-		tag := strings.Split(t.Field(i).Tag.Get("json"), ",")
-		if len(tag) == 2 && tag[1] == "omitempty" {
-			fieldIndices[tag[0]] = i
-		}
-	}
-
+	indexByField := getIndexByField()
 	points := make(map[string]*Data)
 
 	for res.Next() {
 		rec := res.Record()
 
-		idx, ok := fieldIndices[rec.Field()]
+		idx, ok := indexByField[rec.Field()]
 		if !ok {
 			continue
 		}
@@ -86,11 +74,30 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := &Wrapper{Data: getValues(points)}
+	data := &struct {
+		Data []*Data `json:"data"`
+	}{
+		Data: getValues(points),
+	}
+
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
+
+func getIndexByField() map[string]int {
+	indexByField := make(map[string]int)
+	t := reflect.TypeOf(Data{})
+
+	for i := 0; i < t.NumField(); i++ {
+		tag := strings.Split(t.Field(i).Tag.Get("json"), ",")
+		if len(tag) == 2 && tag[1] == "omitempty" {
+			indexByField[tag[0]] = i
+		}
+	}
+
+	return indexByField
 }
 
 func getValues(m map[string]*Data) []*Data {
