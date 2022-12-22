@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/Ribbit-Network/api/internal"
@@ -46,35 +48,38 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	defer res.Close()
+
+	t := reflect.TypeOf(Data{})
+	fieldIndices := make(map[string]int)
+
+	for i := 0; i < t.NumField(); i++ {
+		tag := strings.Split(t.Field(i).Tag.Get("json"), ",")
+		if len(tag) == 2 && tag[1] == "omitempty" {
+			fieldIndices[tag[0]] = i
+		}
+	}
 
 	points := make(map[string]*Data)
+
 	for res.Next() {
 		rec := res.Record()
-		key := rec.Time().String() + rec.ValueByKey("host").(string)
 
+		idx, ok := fieldIndices[rec.Field()]
+		if !ok {
+			continue
+		}
+
+		time := rec.Time()
+		host := rec.ValueByKey("host").(string)
+
+		key := time.String() + host
 		if _, ok := points[key]; !ok {
-			points[key] = &Data{
-				Time: rec.Time(),
-				Host: rec.ValueByKey("host").(string),
-			}
+			points[key] = &Data{Time: time, Host: host}
 		}
 
-		switch rec.Field() {
-		case "alt":
-			points[key].Altitude = rec.Value().(float64)
-		case "co2":
-			points[key].CO2 = rec.Value().(float64)
-		case "humidity":
-			points[key].Humidity = rec.Value().(float64)
-		case "lat":
-			points[key].Latitude = rec.Value().(float64)
-		case "lon":
-			points[key].Longitude = rec.Value().(float64)
-		case "baro_pressure":
-			points[key].Pressure = rec.Value().(float64)
-		case "baro_temperature":
-			points[key].Temperature = rec.Value().(float64)
-		}
+		val := reflect.ValueOf(rec.Value())
+		reflect.ValueOf(points[key]).Elem().Field(idx).Set(val)
 	}
 	if res.Err() != nil {
 		w.WriteHeader(http.StatusInternalServerError)
