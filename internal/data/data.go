@@ -1,7 +1,9 @@
 package data
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"reflect"
@@ -24,15 +26,17 @@ type Data struct {
 	Temperature float64 `json:"baro_temperature,omitempty"`
 }
 
+var csvHeaders = []string{"time", "host", "co2", "lat", "lon", "humidity", "baro_pressure", "baro_temperature", "alt"}
+
 func Handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	q, err := NewQuery(r.URL.Query())
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	log.Println(q)
@@ -42,7 +46,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	res, err := db.Query(q)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "query failed", http.StatusInternalServerError)
 		return
 	}
 	defer res.Close()
@@ -58,32 +62,76 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		time := rec.Time()
-		host := rec.ValueByKey("host").(string)
-
-		key := time.String() + host
-		if _, ok := points[key]; !ok {
-			points[key] = &Data{Time: time, Host: host}
+		t := rec.Time()
+		host, ok := rec.ValueByKey("host").(string)
+		if !ok {
+			continue
 		}
 
-		val := reflect.ValueOf(rec.Value())
-		reflect.ValueOf(points[key]).Elem().Field(idx).Set(val)
+		key := t.String() + host
+		if _, ok := points[key]; !ok {
+			points[key] = &Data{Time: t, Host: host}
+		}
+
+		v := rec.Value()
+		if v == nil {
+			continue
+		}
+		val := reflect.ValueOf(v)
+		field := reflect.ValueOf(points[key]).Elem().Field(idx)
+		if val.Type().AssignableTo(field.Type()) {
+			field.Set(val)
+		}
 	}
 	if res.Err() != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "query result error", http.StatusInternalServerError)
 		return
 	}
 
-	data := &struct {
+	data := getValues(points)
+
+	wantsCSV := r.URL.Query().Get("format") == "csv" ||
+		strings.Contains(r.Header.Get("Accept"), "text/csv")
+
+	if wantsCSV {
+		writeCSV(w, data)
+	} else {
+		writeJSON(w, data)
+	}
+}
+
+func writeJSON(w http.ResponseWriter, data []*Data) {
+	w.Header().Set("Content-Type", "application/json")
+	payload := &struct {
 		Data []*Data `json:"data"`
-	}{
-		Data: getValues(points),
+	}{Data: data}
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		log.Println("json encode error:", err)
+	}
+}
+
+func writeCSV(w http.ResponseWriter, data []*Data) {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=ribbit-data.csv")
+
+	cw := csv.NewWriter(w)
+	_ = cw.Write(csvHeaders)
+
+	for _, d := range data {
+		_ = cw.Write([]string{
+			d.Time.UTC().Format(time.RFC3339),
+			d.Host,
+			fmt.Sprintf("%g", d.CO2),
+			fmt.Sprintf("%g", d.Latitude),
+			fmt.Sprintf("%g", d.Longitude),
+			fmt.Sprintf("%g", d.Humidity),
+			fmt.Sprintf("%g", d.Pressure),
+			fmt.Sprintf("%g", d.Temperature),
+			fmt.Sprintf("%g", d.Altitude),
+		})
 	}
 
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	cw.Flush()
 }
 
 func getIndexByField() map[string]int {
