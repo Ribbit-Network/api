@@ -99,5 +99,4 @@ The API will be available at `http://localhost:<PORT>`.
 
 ## Contributing
 
-Feel free to open an issue or PR!
-You can also join the developer Discord [here](https://discord.com/invite/vq8PkDb2TC).
+Feel free to open an issue or PR! We also have enabled the Github discussion board if you prefer that.
