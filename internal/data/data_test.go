@@ -246,7 +246,7 @@ func TestCollectPoints_SkipsMissingHostTag(t *testing.T) {
 	require.Empty(t, points, "records without a host tag should be skipped")
 }
 
-func TestCollectPoints_SkipsNilValue(t *testing.T) {
+func TestCollectPoints_LeavesPlaceholderWhenValueIsNil(t *testing.T) {
 	ts := time.Unix(200, 0).UTC()
 	it := &fakeIterator{records: []*influxquery.FluxRecord{
 		newRecord("co2", "frog-01", nil, ts),
