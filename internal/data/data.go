@@ -32,7 +32,6 @@ var csvHeaders = []string{"time", "host", "co2", "lat", "lon", "humidity", "baro
 type recordIterator interface {
 	Next() bool
 	Record() *influxquery.FluxRecord
-	Err() error
 }
 
 var fetchPoints = func(q string) ([]*Data, error) {

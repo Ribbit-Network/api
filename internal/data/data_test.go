@@ -172,7 +172,6 @@ func TestWriteCSV_HeaderRowAndColumnOrder(t *testing.T) {
 type fakeIterator struct {
 	records []*influxquery.FluxRecord
 	idx     int
-	err     error
 }
 
 func (f *fakeIterator) Next() bool {
@@ -184,7 +183,6 @@ func (f *fakeIterator) Next() bool {
 }
 
 func (f *fakeIterator) Record() *influxquery.FluxRecord { return f.records[f.idx-1] }
-func (f *fakeIterator) Err() error                      { return f.err }
 
 func newRecord(field, host string, value interface{}, ts time.Time) *influxquery.FluxRecord {
 	values := map[string]interface{}{
