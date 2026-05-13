@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Ribbit-Network/api/internal"
+	influxquery "github.com/influxdata/influxdb-client-go/v2/api/query"
 )
 
 type Data struct {
@@ -28,6 +29,29 @@ type Data struct {
 
 var csvHeaders = []string{"time", "host", "co2", "lat", "lon", "humidity", "baro_pressure", "baro_temperature", "alt"}
 
+type recordIterator interface {
+	Next() bool
+	Record() *influxquery.FluxRecord
+	Err() error
+}
+
+var fetchPoints = func(q string) ([]*Data, error) {
+	db := internal.NewDB()
+	defer db.Close()
+
+	res, err := db.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+
+	points := collectPoints(res)
+	if err := res.Err(); err != nil {
+		return nil, err
+	}
+	return getValues(points), nil
+}
+
 func Handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -41,16 +65,23 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println(q)
 
-	db := internal.NewDB()
-	defer db.Close()
-
-	res, err := db.Query(q)
+	data, err := fetchPoints(q)
 	if err != nil {
 		http.Error(w, "query failed", http.StatusInternalServerError)
 		return
 	}
-	defer res.Close()
 
+	wantsCSV := r.URL.Query().Get("format") == "csv" ||
+		strings.Contains(r.Header.Get("Accept"), "text/csv")
+
+	if wantsCSV {
+		writeCSV(w, data)
+	} else {
+		writeJSON(w, data)
+	}
+}
+
+func collectPoints(res recordIterator) map[string]*Data {
 	indexByField := getIndexByField()
 	points := make(map[string]*Data)
 
@@ -83,21 +114,8 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 			field.Set(val)
 		}
 	}
-	if res.Err() != nil {
-		http.Error(w, "query result error", http.StatusInternalServerError)
-		return
-	}
 
-	data := getValues(points)
-
-	wantsCSV := r.URL.Query().Get("format") == "csv" ||
-		strings.Contains(r.Header.Get("Accept"), "text/csv")
-
-	if wantsCSV {
-		writeCSV(w, data)
-	} else {
-		writeJSON(w, data)
-	}
+	return points
 }
 
 func writeJSON(w http.ResponseWriter, data []*Data) {
