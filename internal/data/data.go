@@ -1,7 +1,6 @@
 package data
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,8 +31,6 @@ type Data struct {
 	Pressure    float64 `json:"baro_pressure,omitempty"`
 	Temperature float64 `json:"baro_temperature,omitempty"`
 }
-
-var csvHeaders = []string{"time", "host", "co2", "lat", "lon", "humidity", "baro_pressure", "baro_temperature", "alt"}
 
 type recordIterator interface {
 	Next() bool
@@ -80,14 +77,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wantsCSV := r.URL.Query().Get("format") == "csv" ||
-		strings.Contains(r.Header.Get("Accept"), "text/csv")
-
-	if wantsCSV {
-		writeCSV(w, data)
-	} else {
-		writeJSON(w, data)
-	}
+	writeJSON(w, data)
 }
 
 func collectPoints(res recordIterator) map[string]*Data {
@@ -135,30 +125,6 @@ func writeJSON(w http.ResponseWriter, data []*Data) {
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
 		log.Println("json encode error:", err)
 	}
-}
-
-func writeCSV(w http.ResponseWriter, data []*Data) {
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=ribbit-data.csv")
-
-	cw := csv.NewWriter(w)
-	_ = cw.Write(csvHeaders)
-
-	for _, d := range data {
-		_ = cw.Write([]string{
-			d.Time.UTC().Format(time.RFC3339),
-			d.Host,
-			fmt.Sprintf("%g", d.CO2),
-			fmt.Sprintf("%g", d.Latitude),
-			fmt.Sprintf("%g", d.Longitude),
-			fmt.Sprintf("%g", d.Humidity),
-			fmt.Sprintf("%g", d.Pressure),
-			fmt.Sprintf("%g", d.Temperature),
-			fmt.Sprintf("%g", d.Altitude),
-		})
-	}
-
-	cw.Flush()
 }
 
 func getIndexByField() map[string]int {

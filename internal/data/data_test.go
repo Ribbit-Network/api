@@ -1,8 +1,6 @@
 package data
 
 import (
-	"bytes"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -111,41 +109,6 @@ func TestHandle_DefaultReturnsJSON(t *testing.T) {
 	require.Equal(t, "frog-01", payload.Data[0].Host)
 }
 
-func TestHandle_FormatCSV_ReturnsCSV(t *testing.T) {
-	withFetchPoints(t, func(string) ([]*Data, error) {
-		return sampleData(), nil
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/data?start=2024-01-01T00:00:00Z&format=csv", nil)
-	rec := httptest.NewRecorder()
-
-	Handle(rec, req)
-
-	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, "text/csv", rec.Header().Get("Content-Type"))
-
-	rows, err := csv.NewReader(bytes.NewReader(rec.Body.Bytes())).ReadAll()
-	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(rows), 2, "expected header row plus at least one data row")
-	require.Equal(t, csvHeaders, rows[0])
-	require.Equal(t, "frog-01", rows[1][1])
-}
-
-func TestHandle_AcceptCSV_ReturnsCSV(t *testing.T) {
-	withFetchPoints(t, func(string) ([]*Data, error) {
-		return sampleData(), nil
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/data?start=2024-01-01T00:00:00Z", nil)
-	req.Header.Set("Accept", "text/csv")
-	rec := httptest.NewRecorder()
-
-	Handle(rec, req)
-
-	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, "text/csv", rec.Header().Get("Content-Type"))
-}
-
 func TestHandle_ForwardsQueryToFetchPoints(t *testing.T) {
 	var got string
 	withFetchPoints(t, func(q string) ([]*Data, error) {
@@ -195,16 +158,6 @@ func TestHandle_IteratorError_Returns500_QueryResultErrorBody(t *testing.T) {
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.Equal(t, "query result error", strings.TrimSpace(rec.Body.String()))
-}
-
-func TestWriteCSV_HeaderRowAndColumnOrder(t *testing.T) {
-	rec := httptest.NewRecorder()
-	writeCSV(rec, nil)
-
-	rows, err := csv.NewReader(bytes.NewReader(rec.Body.Bytes())).ReadAll()
-	require.NoError(t, err)
-	require.Len(t, rows, 1, "expected only the header row when no data is provided")
-	require.Equal(t, csvHeaders, rows[0])
 }
 
 // fakeIterator drives collectPoints from a slice of pre-built FluxRecords.
