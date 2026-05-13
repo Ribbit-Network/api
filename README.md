@@ -23,11 +23,8 @@ Returns CO2, temperature, humidity, and location measurements from the sensor ne
 | `hosts`    | no       | Comma-separated list of sensor IDs to filter by |
 | `fields`   | no       | Comma-separated list of fields to return. Available fields: `co2`, `lat`, `lon`, `humidity`, `baro_pressure`, `baro_temperature`, `alt`. Omit to return all fields. |
 | `interval` | no       | Aggregate readings into windows of this duration (e.g. `5m`, `1h`). Uses mean aggregation. Omit for raw data. |
-| `format`   | no       | Set to `csv` to receive a CSV response instead of JSON. |
 
-You can also request CSV by sending `Accept: text/csv`.
-
-#### JSON response (default)
+#### JSON response
 
 ```
 GET /data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lon&interval=1h
@@ -46,24 +43,6 @@ GET /data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lo
         ...
     ]
 }
-```
-
-#### CSV response
-
-```
-GET /data?start=2024-01-01T00:00:00Z&fields=co2,lat,lon&format=csv
-```
-
-```
-time,host,co2,lat,lon,humidity,baro_pressure,baro_temperature,alt
-2024-01-01T00:00:00Z,a3f2...,412.5,37.77,-122.41,,,, 
-...
-```
-
-Or with a header:
-
-```sh
-curl -H "Accept: text/csv" "https://<host>/data?start=2024-01-01T00:00:00Z"
 ```
 
 ## Running locally
