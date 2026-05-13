@@ -145,6 +145,29 @@ func TestHandle_AcceptCSV_ReturnsCSV(t *testing.T) {
 	require.Equal(t, "text/csv", rec.Header().Get("Content-Type"))
 }
 
+func TestHandle_ForwardsQueryToFetchPoints(t *testing.T) {
+	var got string
+	withFetchPoints(t, func(q string) ([]*Data, error) {
+		got = q
+		return sampleData(), nil
+	})
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/data?start=2024-01-01T00:00:00Z&hosts=frog-01&fields=co2&interval=5m",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+
+	Handle(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	want, err := NewQuery(req.URL.Query())
+	require.NoError(t, err)
+	require.Equal(t, want, got, "Handle must forward the NewQuery result to fetchPoints unchanged")
+}
+
 func TestHandle_FetchError_Returns500(t *testing.T) {
 	withFetchPoints(t, func(string) ([]*Data, error) {
 		return nil, errFake
