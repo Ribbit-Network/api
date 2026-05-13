@@ -4,10 +4,10 @@ Path from local prototype to deployed public API.
 
 ## Security (priority)
 
-- [ ] Rotate the InfluxDB auth token (the current token was committed to the public repo in `888c14b`)
-- [ ] Remove `.env` from the repo (`git rm --cached .env`) and add it to `.gitignore`
-- [ ] Add a `.env.example` with empty values
-- [ ] Issue a read-only InfluxDB token for production use
+- [x] Rotate the InfluxDB auth token (the current token was committed to the public repo in `888c14b`)
+- [x] Remove `.env` from the repo (`git rm --cached .env`) and add it to `.gitignore`
+- [x] Add a `.env.example` with empty values
+- [x] Issue a read-only InfluxDB token for production use
 
 ## Deploy blockers
 
