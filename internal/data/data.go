@@ -3,6 +3,7 @@ package data
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +13,11 @@ import (
 
 	"github.com/Ribbit-Network/api/internal"
 	influxquery "github.com/influxdata/influxdb-client-go/v2/api/query"
+)
+
+var (
+	errQueryFailed = errors.New("query failed")
+	errQueryResult = errors.New("query result error")
 )
 
 type Data struct {
@@ -40,13 +46,13 @@ var fetchPoints = func(q string) ([]*Data, error) {
 
 	res, err := db.Query(q)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", errQueryFailed, err)
 	}
 	defer res.Close()
 
 	points := collectPoints(res)
 	if err := res.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", errQueryResult, err)
 	}
 	return getValues(points), nil
 }
@@ -66,7 +72,11 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	data, err := fetchPoints(q)
 	if err != nil {
-		http.Error(w, "query failed", http.StatusInternalServerError)
+		msg := "query failed"
+		if errors.Is(err, errQueryResult) {
+			msg = "query result error"
+		}
+		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 

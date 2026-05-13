@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -168,9 +169,9 @@ func TestHandle_ForwardsQueryToFetchPoints(t *testing.T) {
 	require.Equal(t, want, got, "Handle must forward the NewQuery result to fetchPoints unchanged")
 }
 
-func TestHandle_FetchError_Returns500(t *testing.T) {
+func TestHandle_FetchError_Returns500_QueryFailedBody(t *testing.T) {
 	withFetchPoints(t, func(string) ([]*Data, error) {
-		return nil, errFake
+		return nil, fmt.Errorf("%w: %v", errQueryFailed, errFake)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/data?start=2024-01-01T00:00:00Z", nil)
@@ -179,6 +180,21 @@ func TestHandle_FetchError_Returns500(t *testing.T) {
 	Handle(rec, req)
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Equal(t, "query failed", strings.TrimSpace(rec.Body.String()))
+}
+
+func TestHandle_IteratorError_Returns500_QueryResultErrorBody(t *testing.T) {
+	withFetchPoints(t, func(string) ([]*Data, error) {
+		return nil, fmt.Errorf("%w: %v", errQueryResult, errFake)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/data?start=2024-01-01T00:00:00Z", nil)
+	rec := httptest.NewRecorder()
+
+	Handle(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Equal(t, "query result error", strings.TrimSpace(rec.Body.String()))
 }
 
 func TestWriteCSV_HeaderRowAndColumnOrder(t *testing.T) {
