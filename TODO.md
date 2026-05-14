@@ -23,7 +23,7 @@ Path from local prototype to deployed public API.
 - [ ] Initialize the InfluxDB client once in `main` rather than per request
 - [ ] Add a `/healthz` endpoint
 - [ ] Add CORS headers if a browser client will call the API
-- [ ] Update `go.mod` from `go 1.17` to `1.22` or later
+- [x] Update `go.mod` from `go 1.17` to `1.22` or later
 - [ ] Refresh dependencies (`go get -u ./... && go mod tidy`)
 - [ ] Replace `log.Println` with `log/slog` for structured logging
 
@@ -32,4 +32,4 @@ Path from local prototype to deployed public API.
 - [ ] GitHub Actions workflow running `go test ./...` and `go vet` on pull requests
 - [ ] Handler-level tests with a mocked database
 - [ ] "Deploying" section in the README
-- [ ] Rate limiting or API keys if abuse becomes a concern
+- [x] Rate limiting or API keys if abuse becomes a concern (API keys added; rate limiting still TODO)

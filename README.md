@@ -14,6 +14,8 @@ Health check. Returns `🐸`.
 
 Returns CO2, temperature, humidity, and location measurements from the sensor network for a given time range.
 
+Requires an API key passed as `Authorization: Bearer <key>` or `X-API-Key: <key>`.
+
 #### Query parameters
 
 | Parameter  | Required | Description |
@@ -47,7 +49,7 @@ GET /data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lo
 
 ## Running locally
 
-**Prerequisites:** [Go](https://go.dev/doc/install) 1.17+
+**Prerequisites:** [Go](https://go.dev/doc/install) 1.22+
 
 1. Clone the repo:
    ```sh
@@ -75,6 +77,41 @@ The API will be available at `http://localhost:<PORT>`.
 | `INFLUXDB_AUTH_TOKEN` | InfluxDB API token (use a read-only token in production) |
 | `INFLUXDB_ORG`        | InfluxDB organization name or email |
 | `INFLUXDB_BUCKET`     | InfluxDB bucket name (`frog_fleet`) |
+| `API_KEY_DB_PATH`     | Path to the SQLite file holding hashed API keys |
+
+## API keys
+
+Access to `/data` requires an API key. Keys live in a SQLite file at `API_KEY_DB_PATH`; only the SHA-256 of each key is stored.
+
+Key management is built into the API binary as a `keygen` subcommand.
+
+Locally:
+
+```sh
+# Issue a new key (the raw key is printed once — record it immediately)
+go run . keygen issue --owner you@example.com
+
+# List existing keys
+go run . keygen list
+
+# Revoke a key by ID
+go run . keygen revoke --id 3
+```
+
+In production (on Fly.io), run the same subcommands against the deployed binary over SSH:
+
+```sh
+fly ssh console -C "/api keygen issue --owner researcher@uni.edu"
+fly ssh console -C "/api keygen list"
+fly ssh console -C "/api keygen revoke --id 7"
+```
+
+Callers pass the key in either header:
+
+```sh
+curl -H "Authorization: Bearer rbnt_..." "$API_URL/data?start=2024-01-01T00:00:00Z"
+curl -H "X-API-Key: rbnt_..."           "$API_URL/data?start=2024-01-01T00:00:00Z"
+```
 
 ## Contributing
 
