@@ -11,6 +11,13 @@ auto_stop_machines = false
 auto_start_machines = true
 min_machines_running = 1
 
+[[mounts]]
+source = "ribbit_api_data"
+destination = "/var/lib/ribbit"
+
+[env]
+API_KEY_DB_PATH = "/var/lib/ribbit/keys.db"
+
 [[vm]]
 size = "shared-cpu-1x"
 memory = "256mb"
