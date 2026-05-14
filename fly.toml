@@ -1,5 +1,4 @@
-[app]
-name = "ribbit-api"
+app = "ribbit-api"
 primary_region = "sjc"
 
 [build]
