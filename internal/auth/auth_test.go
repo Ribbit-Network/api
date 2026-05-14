@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -117,6 +118,22 @@ func TestMiddleware_GoodKey_Bearer(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, "ok", rec.Body.String())
+}
+
+// erroringVerifier simulates a store outage (e.g. SQLite unavailable).
+type erroringVerifier struct{ err error }
+
+func (e erroringVerifier) Verify(string) error { return e.err }
+
+func TestMiddleware_NonAuthError_Returns500(t *testing.T) {
+	h := Require(erroringVerifier{err: errors.New("db is down")})(okHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/data", nil)
+	req.Header.Set("Authorization", "Bearer anything")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 
 func TestMiddleware_GoodKey_XAPIKey(t *testing.T) {

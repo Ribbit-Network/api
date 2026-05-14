@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -19,11 +21,15 @@ func Require(v Verifier) func(http.Handler) http.Handler {
 				unauthorized(w, "missing api key")
 				return
 			}
-			if err := v.Verify(key); err != nil {
+			switch err := v.Verify(key); {
+			case err == nil:
+				next.ServeHTTP(w, r)
+			case errors.Is(err, ErrInvalidKey):
 				unauthorized(w, "invalid api key")
-				return
+			default:
+				log.Printf("auth: verify error: %v", err)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
 			}
-			next.ServeHTTP(w, r)
 		})
 	}
 }
