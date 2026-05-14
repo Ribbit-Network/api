@@ -49,7 +49,7 @@ GET /data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lo
 
 ## Running locally
 
-**Prerequisites:** [Go](https://go.dev/doc/install) 1.22+
+**Prerequisites:** [Go](https://go.dev/doc/install) 1.25+
 
 1. Clone the repo:
    ```sh
