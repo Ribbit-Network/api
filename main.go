@@ -1,17 +1,23 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	_ "modernc.org/sqlite"
 
 	"github.com/Ribbit-Network/api/internal/auth"
 	"github.com/Ribbit-Network/api/internal/data"
+	"github.com/Ribbit-Network/api/internal/ratelimit"
 	"github.com/joho/godotenv"
+	"golang.org/x/time/rate"
 )
 
 func main() {
@@ -31,20 +37,45 @@ func runServer() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	requireKey := auth.Require(store)
 
-	http.HandleFunc("/", handle)
-	http.Handle("/data", requireKey(http.HandlerFunc(data.Handle)))
+	requireKey := auth.Require(store)
+	// 60 requests/minute per key with a burst of 30.
+	limiter := ratelimit.New(rate.Every(time.Second), 60)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", handleRoot)
+	mux.HandleFunc("/healthz", handleHealthz)
+	mux.Handle("/data", requireKey(limiter.Middleware(http.HandlerFunc(data.Handle))))
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	addr := fmt.Sprintf(":%s", port)
 
-	log.Println("API running at http://localhost" + addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatal(err)
+	srv := &http.Server{
+		Addr:         fmt.Sprintf(":%s", port),
+		Handler:      corsMiddleware(mux),
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	go func() {
+		log.Println("API running at http://localhost" + srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("shutdown: %v", err)
 	}
 }
 
@@ -60,6 +91,24 @@ func openKeyStore() (*auth.Store, error) {
 	return auth.NewStore(db)
 }
 
-func handle(w http.ResponseWriter, _ *http.Request) {
+func handleRoot(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprintln(w, "🐸")
+}
+
+func handleHealthz(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprintln(w, "ok")
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, X-API-Key, Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
