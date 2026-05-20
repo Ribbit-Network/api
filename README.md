@@ -115,4 +115,4 @@ curl -H "X-API-Key: rbnt_..."           "$API_URL/data?start=2024-01-01T00:00:00
 
 ## Contributing
 
-Feel free to open an issue or PR! We also have enabled the Github discussion board if you prefer that.
+Feel free to open an issue or PR! We also have enabled the [Github discussion board](https://github.com/Ribbit-Network/api/discussions) if you prefer that.
