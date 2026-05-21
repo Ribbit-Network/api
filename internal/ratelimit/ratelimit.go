@@ -3,9 +3,9 @@ package ratelimit
 
 import (
 	"net/http"
-	"strings"
 	"sync"
 
+	"github.com/Ribbit-Network/api/internal/auth"
 	"golang.org/x/time/rate"
 )
 
@@ -26,13 +26,12 @@ func New(r rate.Limit, b int) *Limiter {
 	}
 }
 
-// Middleware returns HTTP middleware that rate-limits by API key.
-// Keys are read from "Authorization: Bearer <key>" or "X-API-Key: <key>",
-// matching the auth middleware extraction logic. Requests with no key
-// are passed through — the auth middleware upstream handles rejection.
+// Middleware returns HTTP middleware that rate-limits by API key, reading the
+// key from the request context (set by auth.Require). Requests without a key
+// pass through — the auth middleware upstream is responsible for rejecting them.
 func (l *Limiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := extractKey(r)
+		key := auth.KeyFromContext(r.Context())
 		if key != "" && !l.get(key).Allow() {
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
@@ -50,13 +49,4 @@ func (l *Limiter) get(key string) *rate.Limiter {
 		l.entries[key] = lim
 	}
 	return lim
-}
-
-func extractKey(r *http.Request) string {
-	if h := r.Header.Get("Authorization"); h != "" {
-		if rest, ok := strings.CutPrefix(h, "Bearer "); ok {
-			return strings.TrimSpace(rest)
-		}
-	}
-	return strings.TrimSpace(r.Header.Get("X-API-Key"))
 }

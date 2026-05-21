@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"log"
 	"net/http"
@@ -11,7 +12,22 @@ type Verifier interface {
 	Verify(raw string) error
 }
 
-// Require returns middleware that rejects requests without a valid API key.
+type ctxKey struct{}
+
+// WithKey returns ctx carrying key, so downstream middleware can read the
+// verified API key without re-parsing request headers.
+func WithKey(ctx context.Context, key string) context.Context {
+	return context.WithValue(ctx, ctxKey{}, key)
+}
+
+// KeyFromContext returns the verified API key set by Require, or "" if absent.
+func KeyFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(ctxKey{}).(string)
+	return s
+}
+
+// Require returns middleware that rejects requests without a valid API key
+// and stashes the verified key on the request context for downstream handlers.
 // Keys are accepted in either "Authorization: Bearer <key>" or "X-API-Key: <key>".
 func Require(v Verifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -23,7 +39,7 @@ func Require(v Verifier) func(http.Handler) http.Handler {
 			}
 			switch err := v.Verify(key); {
 			case err == nil:
-				next.ServeHTTP(w, r)
+				next.ServeHTTP(w, r.WithContext(WithKey(r.Context(), key)))
 			case errors.Is(err, ErrInvalidKey):
 				unauthorized(w, "invalid api key")
 			default:
