@@ -29,9 +29,13 @@ type Limiter struct {
 }
 
 // New creates a Limiter allowing r tokens per second with a burst of b. Entries
-// untouched for ttl are evicted. Choose ttl >= b/r so an evicted bucket would
-// already have refilled — otherwise eviction effectively grants a fresh burst.
+// untouched for ttl are evicted; ttl must be positive. Choose ttl >= b/r so an
+// evicted bucket would already have refilled — otherwise eviction effectively
+// grants a fresh burst.
 func New(r rate.Limit, b int, ttl time.Duration) *Limiter {
+	if ttl <= 0 {
+		panic("ratelimit: ttl must be > 0")
+	}
 	return &Limiter{
 		entries: make(map[string]*entry),
 		r:       r,
