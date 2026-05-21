@@ -14,16 +14,16 @@ type Verifier interface {
 
 type ctxKey struct{}
 
-// WithKey returns ctx carrying key, so downstream middleware can read the
-// verified API key without re-parsing request headers.
-func WithKey(ctx context.Context, key string) context.Context {
-	return context.WithValue(ctx, ctxKey{}, key)
-}
-
 // KeyFromContext returns the verified API key set by Require, or "" if absent.
+// Only Require populates this value; the setter is intentionally unexported so
+// downstream middleware cannot be fooled by callers stashing arbitrary strings.
 func KeyFromContext(ctx context.Context) string {
 	s, _ := ctx.Value(ctxKey{}).(string)
 	return s
+}
+
+func withKey(ctx context.Context, key string) context.Context {
+	return context.WithValue(ctx, ctxKey{}, key)
 }
 
 // Require returns middleware that rejects requests without a valid API key
@@ -39,7 +39,7 @@ func Require(v Verifier) func(http.Handler) http.Handler {
 			}
 			switch err := v.Verify(key); {
 			case err == nil:
-				next.ServeHTTP(w, r.WithContext(WithKey(r.Context(), key)))
+				next.ServeHTTP(w, r.WithContext(withKey(r.Context(), key)))
 			case errors.Is(err, ErrInvalidKey):
 				unauthorized(w, "invalid api key")
 			default:
