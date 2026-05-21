@@ -33,6 +33,12 @@ func reqWithKey(key string) *http.Request {
 	return req
 }
 
+func reqWithBearer(key string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/data", nil)
+	req.Header.Set("Authorization", "Bearer "+key)
+	return req
+}
+
 func TestRateLimit_AllowsWithinBurst(t *testing.T) {
 	h := limited(New(rate.Limit(1), 5))
 
@@ -54,6 +60,23 @@ func TestRateLimit_BlocksAfterBurst(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, reqWithKey("testkey"))
+	require.Equal(t, http.StatusTooManyRequests, rec.Code)
+}
+
+// Confirms the same rate-limit gate fires when the key arrives via
+// "Authorization: Bearer ..." instead of X-API-Key — i.e. the auth+ratelimit
+// chain works end-to-end regardless of which header the client uses.
+func TestRateLimit_BlocksAfterBurst_Bearer(t *testing.T) {
+	h := limited(New(rate.Limit(1), 2))
+
+	for i := 0; i < 2; i++ {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, reqWithBearer("bearer-key"))
+		require.Equal(t, http.StatusOK, rec.Code)
+	}
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, reqWithBearer("bearer-key"))
 	require.Equal(t, http.StatusTooManyRequests, rec.Code)
 }
 
