@@ -39,7 +39,7 @@ func runServer() {
 	}
 
 	requireKey := auth.Require(store)
-	// 1 request/sec per key with a burst of 60; evict keys idle >10 minutes.
+	// 1 request/sec per key with a burst of 60; lazily evict keys after about 10-20 minutes of idleness.
 	limiter := ratelimit.New(rate.Every(time.Second), 60, 10*time.Minute)
 
 	mux := http.NewServeMux()
