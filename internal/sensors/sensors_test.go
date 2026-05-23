@@ -102,6 +102,12 @@ func TestBuildQuery(t *testing.T) {
 	require.Contains(t, got, `schema.tagValues(bucket: "frog_fleet", tag: "host")`)
 }
 
+func TestBuildQuery_EscapesBucketName(t *testing.T) {
+	got := buildQuery(`weird"name`)
+	require.Contains(t, got, `schema.tagValues(bucket: "weird\"name", tag: "host")`,
+		"bucket names with quotes must be escaped, not interpolated raw")
+}
+
 type fakeIterator struct {
 	records []*influxquery.FluxRecord
 	idx     int

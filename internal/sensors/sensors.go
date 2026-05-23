@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/Ribbit-Network/api/internal"
 	influxquery "github.com/influxdata/influxdb-client-go/v2/api/query"
@@ -60,7 +61,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 func buildQuery(bucket string) string {
 	return fmt.Sprintf(`import "influxdata/influxdb/schema"
-schema.tagValues(bucket: "%s", tag: "host")`, bucket)
+schema.tagValues(bucket: %s, tag: "host")`, strconv.Quote(bucket))
 }
 
 func collectIDs(res recordIterator) []string {
