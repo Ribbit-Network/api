@@ -47,6 +47,26 @@ GET /data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lo
 }
 ```
 
+---
+
+### `GET /sensors`
+
+Returns the list of sensor IDs known to the network (over roughly the last 30 days, per InfluxDB's `schema.tagValues` default).
+
+Requires an API key passed as `Authorization: Bearer <key>` or `X-API-Key: <key>`.
+
+#### JSON response
+
+```
+GET /sensors
+```
+
+```json
+{
+    "sensors": ["a3f2...", "b91c...", "..."]
+}
+```
+
 ## Running locally
 
 **Prerequisites:** [Go](https://go.dev/doc/install) 1.25+
