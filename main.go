@@ -16,6 +16,7 @@ import (
 	"github.com/Ribbit-Network/api/internal/auth"
 	"github.com/Ribbit-Network/api/internal/data"
 	"github.com/Ribbit-Network/api/internal/ratelimit"
+	"github.com/Ribbit-Network/api/internal/sensors"
 	"github.com/joho/godotenv"
 	"golang.org/x/time/rate"
 )
@@ -46,6 +47,7 @@ func runServer() {
 	mux.HandleFunc("/", handleRoot)
 	mux.HandleFunc("/healthz", handleHealthz)
 	mux.Handle("/data", requireKey(limiter.Middleware(http.HandlerFunc(data.Handle))))
+	mux.Handle("/sensors", requireKey(limiter.Middleware(http.HandlerFunc(sensors.Handle))))
 
 	port := os.Getenv("PORT")
 	if port == "" {
