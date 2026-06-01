@@ -39,10 +39,6 @@ info:
 servers:
   - url: https://api.ribbitnetwork.org
     description: Production
-  - url: https://ribbit-api.fly.dev
-    description: Production (Fly-assigned fallback URL)
-  - url: http://localhost:8080
-    description: Local development
 
 tags:
   - name: Data
