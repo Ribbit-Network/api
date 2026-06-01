@@ -5,10 +5,10 @@ A public API for global CO2 measurements, powered by the [Ribbit Network](https:
 ## 📖 Documentation
 
 Interactive API reference (try requests in the browser):
-**[ribbit-api.fly.dev/docs](https://ribbit-api.fly.dev/docs)**
+**[api.ribbitnetwork.org/docs](https://api.ribbitnetwork.org/docs)**
 
 Machine-readable OpenAPI spec:
-**[ribbit-api.fly.dev/openapi.yaml](https://ribbit-api.fly.dev/openapi.yaml)**
+**[api.ribbitnetwork.org/openapi.yaml](https://api.ribbitnetwork.org/openapi.yaml)**
 
 The spec also lives in this repo at [`internal/docs/openapi.yaml`](internal/docs/openapi.yaml) and is the source of truth — use it to generate client SDKs (`openapi-generator`, `oapi-codegen`, etc.) or to import into Postman / Insomnia / Bruno.
 
@@ -18,7 +18,7 @@ Once you have an [API key](#api-keys), fetch the last day of CO2 readings:
 
 ```sh
 curl -H "Authorization: Bearer $RIBBIT_API_KEY" \
-  "https://ribbit-api.fly.dev/data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lon&interval=1h"
+  "https://api.ribbitnetwork.org/data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lon&interval=1h"
 ```
 
 Endpoints at a glance:
@@ -31,7 +31,7 @@ Endpoints at a glance:
 | `GET /data`     | ✅   | Sensor measurements over a time range |
 | `GET /sensors`  | ✅   | List of known sensor IDs |
 
-See **[/docs](https://ribbit-api.fly.dev/docs)** for full parameter, response, and error documentation.
+See **[/docs](https://api.ribbitnetwork.org/docs)** for full parameter, response, and error documentation.
 
 ## Rate limits
 

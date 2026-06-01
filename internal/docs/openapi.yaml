@@ -37,8 +37,10 @@ info:
     url: https://github.com/Ribbit-Network/api
 
 servers:
-  - url: https://ribbit-api.fly.dev
+  - url: https://api.ribbitnetwork.org
     description: Production
+  - url: https://ribbit-api.fly.dev
+    description: Production (Fly-assigned fallback URL)
   - url: http://localhost:8080
     description: Local development
 
