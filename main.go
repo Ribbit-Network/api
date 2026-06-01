@@ -15,6 +15,7 @@ import (
 
 	"github.com/Ribbit-Network/api/internal/auth"
 	"github.com/Ribbit-Network/api/internal/data"
+	"github.com/Ribbit-Network/api/internal/docs"
 	"github.com/Ribbit-Network/api/internal/ratelimit"
 	"github.com/Ribbit-Network/api/internal/sensors"
 	"github.com/joho/godotenv"
@@ -30,7 +31,34 @@ func main() {
 		runKeygen(os.Args[2:])
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "docs" {
+		runDocsServer()
+		return
+	}
 	runServer()
+}
+
+// runDocsServer serves only the OpenAPI reference. Useful for previewing docs
+// changes locally without configuring InfluxDB or the API-key store.
+func runDocsServer() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" && r.URL.Path != "/docs" {
+			http.NotFound(w, r)
+			return
+		}
+		docs.HandleReference(w, r)
+	})
+	mux.HandleFunc("/openapi.yaml", docs.HandleSpec)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Println("docs preview running at http://localhost:" + port)
+	if err := http.ListenAndServe(":"+port, corsMiddleware(mux)); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func runServer() {
@@ -46,6 +74,8 @@ func runServer() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleRoot)
 	mux.HandleFunc("/healthz", handleHealthz)
+	mux.HandleFunc("/docs", docs.HandleReference)
+	mux.HandleFunc("/openapi.yaml", docs.HandleSpec)
 	mux.Handle("/data", requireKey(limiter.Middleware(http.HandlerFunc(data.Handle))))
 	mux.Handle("/sensors", requireKey(limiter.Middleware(http.HandlerFunc(sensors.Handle))))
 

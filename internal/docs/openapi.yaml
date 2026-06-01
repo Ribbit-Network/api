@@ -1,0 +1,293 @@
+openapi: 3.1.0
+info:
+  title: Ribbit Network API
+  version: "1.0.0"
+  summary: Public CO2 measurements from the Ribbit Network sensor fleet.
+  description: |
+    The Ribbit Network API exposes CO2, temperature, humidity, and location
+    readings from the global network of citizen-operated CO2 sensors at
+    [ribbitnetwork.org](https://ribbitnetwork.org).
+
+    ## Authentication
+
+    All data endpoints require an API key. Send it in **either** header:
+
+    ```
+    Authorization: Bearer <your-key>
+    X-API-Key: <your-key>
+    ```
+
+    To request a key, open an issue on
+    [GitHub](https://github.com/Ribbit-Network/api/issues).
+
+    ## Rate limits
+
+    Each API key is limited to **1 request per second**, with a burst of **60**.
+    Exceeding the limit returns `429 Too Many Requests`.
+
+    ## Errors
+
+    Errors are returned as `text/plain` with a short human-readable message and
+    a meaningful HTTP status code.
+  license:
+    name: MIT
+    url: https://github.com/Ribbit-Network/api/blob/main/LICENSE
+  contact:
+    name: Ribbit Network
+    url: https://github.com/Ribbit-Network/api
+
+servers:
+  - url: https://ribbit-api.fly.dev
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Data
+    description: CO2 and environmental measurements
+  - name: Sensors
+    description: Sensor fleet metadata
+  - name: Health
+    description: Service liveness
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Service banner
+      description: Returns a frog emoji. Useful as a no-auth liveness check.
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "🐸\n"
+
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns `ok` when the service is up. No authentication required.
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "ok\n"
+
+  /data:
+    get:
+      tags: [Data]
+      summary: Query sensor measurements
+      description: |
+        Returns CO2, temperature, humidity, and location measurements for the
+        requested time range. Results may be filtered by sensor and aggregated
+        into time windows.
+      parameters:
+        - name: start
+          in: query
+          required: true
+          description: Start of the time range, RFC 3339 timestamp.
+          schema:
+            type: string
+            format: date-time
+          example: "2024-01-01T00:00:00Z"
+        - name: stop
+          in: query
+          required: false
+          description: End of the time range, RFC 3339 timestamp. Omit to query through the present.
+          schema:
+            type: string
+            format: date-time
+          example: "2024-01-02T00:00:00Z"
+        - name: hosts
+          in: query
+          required: false
+          description: Comma-separated list of sensor IDs to filter by. See `/sensors` for the available IDs.
+          schema:
+            type: string
+          example: "a3f2...,b91c..."
+        - name: fields
+          in: query
+          required: false
+          description: |
+            Comma-separated list of fields to return. Omit to return all
+            available fields. Valid values: `co2`, `lat`, `lon`, `humidity`,
+            `baro_pressure`, `baro_temperature`, `alt`.
+          schema:
+            type: string
+          example: "co2,lat,lon"
+        - name: interval
+          in: query
+          required: false
+          description: |
+            Aggregate readings into windows of this duration using mean
+            aggregation. Accepts Go duration syntax (e.g. `30s`, `5m`, `1h`).
+            Omit for raw data.
+          schema:
+            type: string
+          example: "1h"
+      responses:
+        "200":
+          description: Measurements for the requested range.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataResponse"
+              example:
+                data:
+                  - time: "2024-01-01T00:00:00Z"
+                    host: "a3f2..."
+                    co2: 412.5
+                    lat: 37.77
+                    lon: -122.41
+                  - time: "2024-01-01T01:00:00Z"
+                    host: "a3f2..."
+                    co2: 415.1
+                    lat: 37.77
+                    lon: -122.41
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /sensors:
+    get:
+      tags: [Sensors]
+      summary: List sensor IDs
+      description: |
+        Returns the set of sensor IDs that have reported data recently
+        (approximately the last 30 days, per InfluxDB's default tag-value
+        lookback).
+      responses:
+        "200":
+          description: Sensor IDs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SensorsResponse"
+              example:
+                sensors: ["a3f2...", "b91c...", "c7d4..."]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "Send your API key as `Authorization: Bearer <key>`."
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: "Send your API key in the `X-API-Key` header."
+
+  schemas:
+    DataPoint:
+      type: object
+      description: A single measurement from one sensor at one timestamp. Fields omitted from `fields` are not returned.
+      required: [time, host]
+      properties:
+        time:
+          type: string
+          format: date-time
+          description: Measurement timestamp (UTC).
+        host:
+          type: string
+          description: Sensor ID.
+        co2:
+          type: number
+          format: double
+          description: CO2 concentration (ppm).
+        lat:
+          type: number
+          format: double
+          description: Sensor latitude (degrees).
+        lon:
+          type: number
+          format: double
+          description: Sensor longitude (degrees).
+        alt:
+          type: number
+          format: double
+          description: Sensor altitude (meters).
+        humidity:
+          type: number
+          format: double
+          description: Relative humidity (%).
+        baro_pressure:
+          type: number
+          format: double
+          description: Barometric pressure (hPa).
+        baro_temperature:
+          type: number
+          format: double
+          description: Temperature from the barometric sensor (°C).
+
+    DataResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataPoint"
+
+    SensorsResponse:
+      type: object
+      required: [sensors]
+      properties:
+        sensors:
+          type: array
+          items:
+            type: string
+          description: Sensor IDs.
+
+  responses:
+    BadRequest:
+      description: Invalid query parameters (e.g. missing `start`, malformed RFC 3339 time, unparseable `interval`).
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: 'missing required parameter: "start"'
+    Unauthorized:
+      description: Missing or invalid API key.
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: "missing api key"
+    RateLimited:
+      description: Rate limit exceeded for this API key (1 req/s, burst 60).
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: "rate limit exceeded"
+    ServerError:
+      description: Internal error while querying the time-series store.
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: "query failed"

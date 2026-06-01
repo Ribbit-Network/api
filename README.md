@@ -2,70 +2,40 @@
 
 A public API for global CO2 measurements, powered by the [Ribbit Network](https://ribbitnetwork.org) — an open-source network of citizen-operated CO2 sensors.
 
-## Endpoints
+## 📖 Documentation
 
-### `GET /`
+Interactive API reference (try requests in the browser):
+**[ribbit-api.fly.dev/docs](https://ribbit-api.fly.dev/docs)**
 
-Health check. Returns `🐸`.
+Machine-readable OpenAPI spec:
+**[ribbit-api.fly.dev/openapi.yaml](https://ribbit-api.fly.dev/openapi.yaml)**
 
----
+The spec also lives in this repo at [`internal/docs/openapi.yaml`](internal/docs/openapi.yaml) and is the source of truth — use it to generate client SDKs (`openapi-generator`, `oapi-codegen`, etc.) or to import into Postman / Insomnia / Bruno.
 
-### `GET /data`
+## Quickstart
 
-Returns CO2, temperature, humidity, and location measurements from the sensor network for a given time range.
+Once you have an [API key](#api-keys), fetch the last day of CO2 readings:
 
-Requires an API key passed as `Authorization: Bearer <key>` or `X-API-Key: <key>`.
-
-#### Query parameters
-
-| Parameter  | Required | Description |
-|------------|----------|-------------|
-| `start`    | yes      | Start of time range (RFC 3339, e.g. `2024-01-01T00:00:00Z`) |
-| `stop`     | no       | End of time range (RFC 3339). Omit to query through the present. |
-| `hosts`    | no       | Comma-separated list of sensor IDs to filter by |
-| `fields`   | no       | Comma-separated list of fields to return. Available fields: `co2`, `lat`, `lon`, `humidity`, `baro_pressure`, `baro_temperature`, `alt`. Omit to return all fields. |
-| `interval` | no       | Aggregate readings into windows of this duration (e.g. `5m`, `1h`). Uses mean aggregation. Omit for raw data. |
-
-#### JSON response
-
-```
-GET /data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lon&interval=1h
+```sh
+curl -H "Authorization: Bearer $RIBBIT_API_KEY" \
+  "https://ribbit-api.fly.dev/data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lon&interval=1h"
 ```
 
-```json
-{
-    "data": [
-        {
-            "time": "2024-01-01T00:00:00Z",
-            "host": "a3f2...",
-            "co2": 412.5,
-            "lat": 37.77,
-            "lon": -122.41
-        },
-        ...
-    ]
-}
-```
+Endpoints at a glance:
 
----
+| Endpoint        | Auth | Description |
+|-----------------|------|-------------|
+| `GET /`         | —    | Health banner (`🐸`) |
+| `GET /healthz`  | —    | Liveness check (`ok`) |
+| `GET /docs`     | —    | Interactive API reference |
+| `GET /data`     | ✅   | Sensor measurements over a time range |
+| `GET /sensors`  | ✅   | List of known sensor IDs |
 
-### `GET /sensors`
+See **[/docs](https://ribbit-api.fly.dev/docs)** for full parameter, response, and error documentation.
 
-Returns the list of sensor IDs known to the network (over roughly the last 30 days, per InfluxDB's `schema.tagValues` default).
+## Rate limits
 
-Requires an API key passed as `Authorization: Bearer <key>` or `X-API-Key: <key>`.
-
-#### JSON response
-
-```
-GET /sensors
-```
-
-```json
-{
-    "sensors": ["a3f2...", "b91c...", "..."]
-}
-```
+Each API key is limited to **1 request per second** with a burst of **60**. Exceeding the limit returns `429 Too Many Requests`.
 
 ## Running locally
 
@@ -83,12 +53,22 @@ GET /sensors
 
 3. Run:
    ```sh
-   go run main.go
+   go run .
    ```
 
-The API will be available at `http://localhost:<PORT>`.
+The API will be available at `http://localhost:8080`, and the interactive docs at `http://localhost:8080/docs`.
 
-## Environment variables
+### Previewing just the docs
+
+If you only want to render the OpenAPI page (no InfluxDB or API-key store needed), run:
+
+```sh
+go run . docs
+```
+
+This serves the embedded spec and Scalar reference at `http://localhost:8080`. Handy when iterating on [`internal/docs/openapi.yaml`](internal/docs/openapi.yaml).
+
+### Environment variables
 
 | Variable              | Description |
 |-----------------------|-------------|
@@ -101,7 +81,7 @@ The API will be available at `http://localhost:<PORT>`.
 
 ## API keys
 
-Access to `/data` requires an API key. Keys live in a SQLite file at `API_KEY_DB_PATH`; only the SHA-256 of each key is stored.
+Access to `/data` and `/sensors` requires an API key. Keys live in a SQLite file at `API_KEY_DB_PATH`; only the SHA-256 of each key is stored.
 
 Key management is built into the API binary as a `keygen` subcommand.
 
@@ -132,6 +112,14 @@ Callers pass the key in either header:
 curl -H "Authorization: Bearer rbnt_..." "$API_URL/data?start=2024-01-01T00:00:00Z"
 curl -H "X-API-Key: rbnt_..."           "$API_URL/data?start=2024-01-01T00:00:00Z"
 ```
+
+## Updating the docs
+
+The OpenAPI spec at [`internal/docs/openapi.yaml`](internal/docs/openapi.yaml) is embedded into the binary at build time. When you add or change an endpoint:
+
+1. Edit the spec to match.
+2. `go build ./...` to verify it still compiles (the spec is `go:embed`-ed).
+3. Visit `/docs` locally to spot-check the rendered output.
 
 ## Contributing
 
