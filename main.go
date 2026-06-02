@@ -67,17 +67,24 @@ func runServer() {
 		log.Fatal(err)
 	}
 
-	requireKey := auth.Require(store)
-	// 1 request/sec per key with a burst of 60; lazily evict keys after about 10-20 minutes of idleness.
-	limiter := ratelimit.New(rate.Every(time.Second), 60, 10*time.Minute)
+	// Endpoints are open to anonymous callers but give a higher tier to keyed
+	// ones. Optional auth lets unkeyed requests through (rejecting only bad
+	// keys); Tiered then limits keyed callers by key and anonymous callers by IP.
+	optionalKey := auth.Optional(store)
+	// Keyed tier: 1 request/sec with a burst of 60.
+	keyed := ratelimit.New(rate.Every(time.Second), 60, 10*time.Minute)
+	// Free tier: sized for "poll one sensor once a minute" — 1 req/min sustained
+	// with a small burst to absorb startup/retries. ttl >= burst/rate (= 5 min).
+	anon := ratelimit.New(rate.Every(time.Minute), 5, 30*time.Minute)
+	tier := ratelimit.Tiered(keyed, anon)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleRoot)
 	mux.HandleFunc("/healthz", handleHealthz)
 	mux.HandleFunc("/docs", docs.HandleReference)
 	mux.HandleFunc("/openapi.yaml", docs.HandleSpec)
-	mux.Handle("/data", requireKey(limiter.Middleware(http.HandlerFunc(data.Handle))))
-	mux.Handle("/sensors", requireKey(limiter.Middleware(http.HandlerFunc(sensors.Handle))))
+	mux.Handle("/data", optionalKey(tier(http.HandlerFunc(data.Handle))))
+	mux.Handle("/sensors", optionalKey(tier(http.HandlerFunc(sensors.Handle))))
 
 	port := os.Getenv("PORT")
 	if port == "" {

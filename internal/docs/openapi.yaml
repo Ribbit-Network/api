@@ -10,20 +10,37 @@ info:
 
     ## Authentication
 
-    All data endpoints require an API key. Send it in **either** header:
+    The data endpoints are **open** — you can call them without an API key on
+    the free tier. A key is optional and simply unlocks much higher rate limits.
+
+    When you have a key, send it in **either** header:
 
     ```
     Authorization: Bearer <your-key>
     X-API-Key: <your-key>
     ```
 
+    Sending a key that is invalid or revoked returns `401 Unauthorized` (a wrong
+    key is treated as a mistake, not a downgrade to the free tier). Omitting the
+    header entirely is fine — you are simply served on the free tier.
+
     To request a key, open an issue on
     [GitHub](https://github.com/Ribbit-Network/api/issues).
 
     ## Rate limits
 
-    Each API key is limited to **1 request per second**, with a burst of **60**.
-    Exceeding the limit returns `429 Too Many Requests`.
+    There are two tiers:
+
+    | Tier            | Limited by  | Sustained rate     | Burst |
+    | --------------- | ----------- | ------------------ | ----- |
+    | Free (no key)   | client IP   | 1 request / minute | 5     |
+    | Keyed           | API key     | 1 request / second | 60    |
+
+    The free tier is sized for polling a single sensor about once a minute. For
+    anything heavier — more sensors, faster polling — request a key.
+
+    Exceeding the limit returns `429 Too Many Requests` with a `Retry-After`
+    header indicating how many seconds to wait before retrying.
 
     ## Errors
 
@@ -48,7 +65,10 @@ tags:
   - name: Health
     description: Service liveness
 
+# An empty requirement ({}) means a key is optional — anonymous callers are
+# served on the free tier; a key raises the rate limit.
 security:
+  - {}
   - bearerAuth: []
   - apiKeyAuth: []
 
@@ -269,14 +289,25 @@ components:
             type: string
           example: 'missing required parameter: "start"'
     Unauthorized:
-      description: Missing or invalid API key.
+      description: |
+        The supplied API key is invalid or revoked. Omitting the key is **not**
+        an error — those requests are served on the free tier instead.
       content:
         text/plain:
           schema:
             type: string
-          example: "missing api key"
+          example: "invalid api key"
     RateLimited:
-      description: Rate limit exceeded for this API key (1 req/s, burst 60).
+      description: |
+        Rate limit exceeded for this tier — the free tier (by IP, 1 req/min,
+        burst 5) or the keyed tier (by key, 1 req/s, burst 60). The response
+        includes a `Retry-After` header with the seconds to wait.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+          example: 30
       content:
         text/plain:
           schema:

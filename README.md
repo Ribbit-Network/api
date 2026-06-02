@@ -14,7 +14,13 @@ The spec also lives in this repo at [`internal/docs/openapi.yaml`](internal/docs
 
 ## Quickstart
 
-Once you have an [API key](#api-keys), fetch the last day of CO2 readings:
+No key needed to get started — fetch the last day of CO2 readings on the free tier:
+
+```sh
+curl "https://api.ribbitnetwork.org/data?start=2024-01-01T00:00:00Z&stop=2024-01-02T00:00:00Z&fields=co2,lat,lon&interval=1h"
+```
+
+An [API key](#api-keys) is optional and unlocks much higher [rate limits](#rate-limits) — pass it as a header:
 
 ```sh
 curl -H "Authorization: Bearer $RIBBIT_API_KEY" \
@@ -23,19 +29,24 @@ curl -H "Authorization: Bearer $RIBBIT_API_KEY" \
 
 Endpoints at a glance:
 
-| Endpoint        | Auth | Description |
-|-----------------|------|-------------|
-| `GET /`         | —    | Health banner (`🐸`) |
-| `GET /healthz`  | —    | Liveness check (`ok`) |
-| `GET /docs`     | —    | Interactive API reference |
-| `GET /data`     | ✅   | Sensor measurements over a time range |
-| `GET /sensors`  | ✅   | List of known sensor IDs |
+| Endpoint        | Auth      | Description |
+|-----------------|-----------|-------------|
+| `GET /`         | —         | Health banner (`🐸`) |
+| `GET /healthz`  | —         | Liveness check (`ok`) |
+| `GET /docs`     | —         | Interactive API reference |
+| `GET /data`     | optional  | Sensor measurements over a time range |
+| `GET /sensors`  | optional  | List of known sensor IDs |
 
 See **[/docs](https://api.ribbitnetwork.org/docs)** for full parameter, response, and error documentation.
 
 ## Rate limits
 
-Each API key is limited to **1 request per second** with a burst of **60**. Exceeding the limit returns `429 Too Many Requests`.
+| Tier            | Limited by | Sustained rate     | Burst |
+|-----------------|------------|--------------------|-------|
+| Free (no key)   | client IP  | 1 request / minute | 5     |
+| Keyed           | API key    | 1 request / second | 60    |
+
+The free tier is sized for polling a single sensor about once a minute. For more sensors or faster polling, [get a key](#api-keys). Exceeding the limit returns `429 Too Many Requests` with a `Retry-After` header.
 
 ## Running locally
 
@@ -82,7 +93,7 @@ This serves the embedded spec and Scalar reference at `http://localhost:8080`. H
 
 ## API keys
 
-Access to `/data` and `/sensors` requires an API key. Keys live in a SQLite file at `API_KEY_DB_PATH`; only the SHA-256 of each key is stored.
+`/data` and `/sensors` are open to anonymous callers on the free tier; an API key is optional and raises the [rate limit](#rate-limits) to the keyed tier. A key that is sent but invalid or revoked is rejected with `401` rather than downgraded to the free tier. Keys live in a SQLite file at `API_KEY_DB_PATH`; only the SHA-256 of each key is stored.
 
 Key management is built into the API binary as a `keygen` subcommand.
 

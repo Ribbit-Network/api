@@ -127,6 +127,88 @@ func TestRateLimit_EvictsIdleEntries(t *testing.T) {
 	require.True(t, ok, "freshly-touched key should remain")
 }
 
+// tiered wires Optional auth in front of Tiered, mirroring main.go: keyed
+// requests are limited by key, anonymous ones by IP.
+func tiered(keyed, anon *Limiter) http.Handler {
+	return auth.Optional(allowAll{})(Tiered(keyed, anon)(okHandler()))
+}
+
+func anonReq(ip string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/data", nil)
+	req.Header.Set("Fly-Client-IP", ip)
+	return req
+}
+
+// Anonymous callers are throttled at the (slower) anon limiter's rate.
+func TestTiered_AnonThrottledByIP(t *testing.T) {
+	// Generous keyed tier so it can't be the thing doing the limiting here.
+	h := tiered(newLim(rate.Limit(100), 100), newLim(rate.Limit(1), 2))
+
+	for i := 0; i < 2; i++ {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, anonReq("203.0.113.7"))
+		require.Equal(t, http.StatusOK, rec.Code, "anon request %d should be within burst", i+1)
+	}
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, anonReq("203.0.113.7"))
+	require.Equal(t, http.StatusTooManyRequests, rec.Code)
+	require.NotEmpty(t, rec.Header().Get("Retry-After"), "429 should advertise Retry-After")
+}
+
+// A keyed caller gets the keyed limits, not the anon ones — even when the anon
+// tier is tiny, a key lets them sail past it.
+func TestTiered_KeyedUsesKeyedLimits(t *testing.T) {
+	h := tiered(newLim(rate.Limit(1), 10), newLim(rate.Limit(1), 1))
+
+	for i := 0; i < 10; i++ {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, reqWithKey("testkey"))
+		require.Equal(t, http.StatusOK, rec.Code, "keyed request %d should pass", i+1)
+	}
+}
+
+// Different anonymous IPs draw from independent buckets.
+func TestTiered_AnonIndependentPerIP(t *testing.T) {
+	h := tiered(newLim(rate.Limit(100), 100), newLim(rate.Limit(1), 1))
+
+	for _, ip := range []string{"198.51.100.1", "198.51.100.2", "198.51.100.3"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, anonReq(ip))
+		require.Equal(t, http.StatusOK, rec.Code, "first request from %s should pass", ip)
+	}
+}
+
+func TestClientIP(t *testing.T) {
+	t.Run("prefers Fly-Client-IP", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Fly-Client-IP", "1.2.3.4")
+		req.Header.Set("X-Forwarded-For", "5.6.7.8")
+		require.Equal(t, "1.2.3.4", clientIP(req))
+	})
+	t.Run("first XFF hop", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("X-Forwarded-For", "5.6.7.8, 9.10.11.12")
+		require.Equal(t, "5.6.7.8", clientIP(req))
+	})
+	t.Run("falls back to RemoteAddr host", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.RemoteAddr = "192.0.2.5:5555"
+		require.Equal(t, "192.0.2.5", clientIP(req))
+	})
+	t.Run("trims and canonicalizes header whitespace", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Fly-Client-IP", "  1.2.3.4  ")
+		require.Equal(t, "1.2.3.4", clientIP(req))
+	})
+	t.Run("ignores a non-IP header value and falls back", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Fly-Client-IP", "not-an-ip")
+		req.RemoteAddr = "192.0.2.9:1234"
+		require.Equal(t, "192.0.2.9", clientIP(req))
+	})
+}
+
 func TestRateLimit_KeepsActiveEntries(t *testing.T) {
 	clock := time.Unix(1_000_000, 0)
 	l := New(rate.Limit(1), 1, time.Minute)
