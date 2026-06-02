@@ -103,7 +103,7 @@ In production (on Fly.io), run the same subcommands against the deployed binary 
 
 ```sh
 fly ssh console -C "/api keygen issue --owner researcher@uni.edu"
-fly ssh console -C "/api keygen issue --owner kristen.e.okorn@nasa.gov"
+fly ssh console -C "/api keygen issue --owner you@example.com"
 fly ssh console -C "/api keygen list"
 fly ssh console -C "/api keygen revoke --id 7"
 ```
