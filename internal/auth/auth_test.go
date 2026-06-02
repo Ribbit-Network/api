@@ -146,3 +146,60 @@ func TestMiddleware_GoodKey_XAPIKey(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 }
+
+// Optional: a missing key passes through anonymously, and no key is stashed.
+func TestOptional_MissingKey_PassesThroughAnonymous(t *testing.T) {
+	var gotKey string
+	h := Optional(stubVerifier{valid: "good"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotKey = KeyFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/data", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Empty(t, gotKey, "anonymous request should carry no key on context")
+}
+
+// Optional: a valid key passes through and is stashed on the context.
+func TestOptional_GoodKey_StashesKey(t *testing.T) {
+	var gotKey string
+	h := Optional(stubVerifier{valid: "good"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotKey = KeyFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/data", nil)
+	req.Header.Set("X-API-Key", "good")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, "good", gotKey)
+}
+
+// Optional: a present-but-invalid key is rejected, not silently downgraded.
+func TestOptional_BadKey_Rejected(t *testing.T) {
+	h := Optional(stubVerifier{valid: "good"})(okHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/data", nil)
+	req.Header.Set("Authorization", "Bearer wrong")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+// Optional: a store outage on a present key surfaces as 500.
+func TestOptional_NonAuthError_Returns500(t *testing.T) {
+	h := Optional(erroringVerifier{err: errors.New("db is down")})(okHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/data", nil)
+	req.Header.Set("X-API-Key", "anything")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+}

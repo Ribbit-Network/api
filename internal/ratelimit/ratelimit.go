@@ -2,7 +2,11 @@
 package ratelimit
 
 import (
+	"math"
+	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -57,6 +61,54 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// Tiered returns middleware that rate-limits authenticated callers by API key
+// against the keyed limiter, and anonymous callers by client IP against the
+// (slower) anon limiter. The key is read from the request context, so this must
+// be mounted behind auth.Optional. Rejections carry a Retry-After header.
+func Tiered(keyed, anon *Limiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var lim *rate.Limiter
+			if key := auth.KeyFromContext(r.Context()); key != "" {
+				lim = keyed.get(key)
+			} else {
+				lim = anon.get(clientIP(r))
+			}
+			if res := lim.Reserve(); !res.OK() || res.Delay() > 0 {
+				if res.OK() {
+					// We're rejecting, so don't actually consume the token; just
+					// use the reservation to report when the caller may retry.
+					w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(res.Delay().Seconds()))))
+					res.Cancel()
+				}
+				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// clientIP returns the originating client address. On Fly.io the edge proxy
+// sets Fly-Client-IP (and X-Forwarded-For); we trust those because the app is
+// only reachable through that proxy. A directly-exposed service must not trust
+// these headers, since clients can forge them.
+func clientIP(r *http.Request) string {
+	if ip := r.Header.Get("Fly-Client-IP"); ip != "" {
+		return ip
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := strings.IndexByte(xff, ','); i >= 0 {
+			return strings.TrimSpace(xff[:i]) // first hop is the original client
+		}
+		return strings.TrimSpace(xff)
+	}
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 func (l *Limiter) get(key string) *rate.Limiter {
