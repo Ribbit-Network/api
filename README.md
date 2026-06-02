@@ -46,7 +46,9 @@ See **[/docs](https://api.ribbitnetwork.org/docs)** for full parameter, response
 | Free (no key)   | client IP  | 1 request / minute | 5     |
 | Keyed           | API key    | 1 request / second | 60    |
 
-The free tier is sized for polling a single sensor about once a minute. For more sensors or faster polling, [get a key](#api-keys). Exceeding the limit returns `429 Too Many Requests` with a `Retry-After` header.
+The free tier is sized for polling a single sensor about once a minute. For more sensors or faster polling. Exceeding the limit returns `429 Too Many Requests` with a `Retry-After` header.
+
+If you would like an API key for faster data access etc, please send an email to hello @ ribbitnetwork.org with a brief description of your usecase and who you are. :)
 
 ## Running locally
 
