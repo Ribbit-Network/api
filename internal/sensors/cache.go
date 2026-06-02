@@ -36,7 +36,7 @@ func (c *cache) get() ([]string, error) {
 	defer c.mu.Unlock()
 
 	if c.valid && c.now().Before(c.expires) {
-		return c.ids, nil
+		return append([]string(nil), c.ids...), nil
 	}
 
 	ids, err := c.fetch()
@@ -47,7 +47,7 @@ func (c *cache) get() ([]string, error) {
 	c.ids = ids
 	c.expires = c.now().Add(c.ttl)
 	c.valid = true
-	return ids, nil
+	return append([]string(nil), ids...), nil
 }
 
 // reset clears the cached value, forcing the next get to refetch. Used in tests.
