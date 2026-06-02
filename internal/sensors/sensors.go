@@ -46,7 +46,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ids, err := fetchSensors()
+	ids, err := sensorCache().get()
 	if err != nil {
 		msg := "query failed"
 		if errors.Is(err, errQueryResult) {

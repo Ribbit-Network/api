@@ -78,6 +78,7 @@ This serves the embedded spec and Scalar reference at `http://localhost:8080`. H
 | `INFLUXDB_ORG`        | InfluxDB organization name or email |
 | `INFLUXDB_BUCKET`     | InfluxDB bucket name (`frog_fleet`) |
 | `API_KEY_DB_PATH`     | Path to the SQLite file holding hashed API keys |
+| `SENSORS_CACHE_TTL`   | How long the `/sensors` list is cached (Go duration, e.g. `10m`; default `5m`) |
 
 ## API keys
 
@@ -102,6 +103,7 @@ In production (on Fly.io), run the same subcommands against the deployed binary 
 
 ```sh
 fly ssh console -C "/api keygen issue --owner researcher@uni.edu"
+fly ssh console -C "/api keygen issue --owner you@example.com"
 fly ssh console -C "/api keygen list"
 fly ssh console -C "/api keygen revoke --id 7"
 ```

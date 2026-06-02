@@ -17,7 +17,8 @@ func withFetchSensors(t *testing.T, fn func() ([]string, error)) {
 	t.Helper()
 	orig := fetchSensors
 	fetchSensors = fn
-	t.Cleanup(func() { fetchSensors = orig })
+	sensorCache().reset()
+	t.Cleanup(func() { fetchSensors = orig; sensorCache().reset() })
 }
 
 func TestHandle_MethodNotAllowed(t *testing.T) {
