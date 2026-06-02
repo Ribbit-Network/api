@@ -84,19 +84,29 @@ func TestCache_SerializesConcurrentFetches(t *testing.T) {
 	c.now = func() time.Time { return now }
 
 	const n = 16
+	errCh := make(chan error, n)
 	var wg sync.WaitGroup
 	wg.Add(n)
 	for i := 0; i < n; i++ {
 		go func() {
 			defer wg.Done()
 			ids, err := c.get()
-			require.NoError(t, err)
-			require.Equal(t, []string{"frog"}, ids)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if len(ids) != 1 || ids[0] != "frog" {
+				errCh <- errors.New("unexpected ids")
+			}
 		}()
 	}
 	close(release)
 	wg.Wait()
+	close(errCh)
 
+	for err := range errCh {
+		require.NoError(t, err)
+	}
 	require.Equal(t, 1, calls, "a burst of concurrent requests must trigger only one fetch")
 }
 
