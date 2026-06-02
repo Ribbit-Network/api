@@ -196,6 +196,17 @@ func TestClientIP(t *testing.T) {
 		req.RemoteAddr = "192.0.2.5:5555"
 		require.Equal(t, "192.0.2.5", clientIP(req))
 	})
+	t.Run("trims and canonicalizes header whitespace", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Fly-Client-IP", "  1.2.3.4  ")
+		require.Equal(t, "1.2.3.4", clientIP(req))
+	})
+	t.Run("ignores a non-IP header value and falls back", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Fly-Client-IP", "not-an-ip")
+		req.RemoteAddr = "192.0.2.9:1234"
+		require.Equal(t, "192.0.2.9", clientIP(req))
+	})
 }
 
 func TestRateLimit_KeepsActiveEntries(t *testing.T) {

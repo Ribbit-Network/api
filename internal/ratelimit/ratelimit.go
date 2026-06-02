@@ -96,19 +96,37 @@ func Tiered(keyed, anon *Limiter) func(http.Handler) http.Handler {
 // only reachable through that proxy. A directly-exposed service must not trust
 // these headers, since clients can forge them.
 func clientIP(r *http.Request) string {
-	if ip := r.Header.Get("Fly-Client-IP"); ip != "" {
+	if ip := parseIP(r.Header.Get("Fly-Client-IP")); ip != "" {
 		return ip
 	}
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		first := xff
 		if i := strings.IndexByte(xff, ','); i >= 0 {
-			return strings.TrimSpace(xff[:i]) // first hop is the original client
+			first = xff[:i] // first hop is the original client
 		}
-		return strings.TrimSpace(xff)
+		if ip := parseIP(first); ip != "" {
+			return ip
+		}
 	}
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		return host
+		if ip := parseIP(host); ip != "" {
+			return ip
+		}
 	}
 	return r.RemoteAddr
+}
+
+// parseIP trims s and returns the canonical text form of the IP it holds, or ""
+// if s is not a valid IP. Canonicalizing collapses whitespace and equivalent
+// representations so one client maps to one bucket, and rejecting non-IP values
+// stops a caller from forging arbitrary bucket keys (which would let them grow
+// the limiter map) if this ever runs without a trusted proxy in front.
+func parseIP(s string) string {
+	ip := net.ParseIP(strings.TrimSpace(s))
+	if ip == nil {
+		return ""
+	}
+	return ip.String()
 }
 
 func (l *Limiter) get(key string) *rate.Limiter {
